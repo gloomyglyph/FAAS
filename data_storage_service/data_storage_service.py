@@ -5,6 +5,7 @@ import socket
 import pymongo
 from pymongo import MongoClient
 from gridfs import GridFS
+import redis
 import data_storage_pb2
 import data_storage_pb2_grpc
 import common_pb2
@@ -100,11 +101,34 @@ def prepare_and_validate_document(image_id, gridfs_id, image_hash, face_results)
         return None, str(e)
 
 
+def store_in_redis(redis_client, image_hash, document):
+    """Store document in Redis with image_hash as the key."""
+    try:
+        # Serialize document to JSON
+        json_data = json.dumps(document, default=json_util.default)
+        redis_client.set(image_hash, json_data)
+        logger.info(f"Stored document in Redis with key: {image_hash}")
+        return None
+    except redis.RedisError as e:
+        logger.error(f"Failed to store document in Redis: {str(e)}")
+        return str(e)
+
+
 class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
     def __init__(self):
         self.client = MongoClient("mongodb://localhost:27017/")
         self.db = self.client["face_analysis_db"]
         self.fs = GridFS(self.db)
+        # Initialize Redis client
+        self.redis_client = redis.Redis(
+            host="localhost", port=6379, db=0, decode_responses=True
+        )
+        try:
+            self.redis_client.ping()
+            logger.info("Connected to Redis")
+        except redis.ConnectionError as e:
+            logger.error(f"Failed to connect to Redis: {str(e)}")
+            raise
         logger.info("Connected to MongoDB")
 
     def StoreFaceResult(self, request, context):
@@ -136,6 +160,13 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
             # Insert document into MongoDB
             self.db.face_results.insert_one(document)
             logger.info(f"Stored face result for image ID: {image_id}")
+
+            # Store document in Redis
+            redis_error = store_in_redis(self.redis_client, image_hash, document)
+            if redis_error:
+                # Log error but don't fail the request, as MongoDB storage succeeded
+                logger.warning(f"Proceeding despite Redis error: {redis_error}")
+
             return common_pb2.DoneFlagToFaceAnalysisServiceResponse(
                 success=True, error_message=""
             )
