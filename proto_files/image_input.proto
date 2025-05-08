@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package face_aggregation;
+
+import "common.proto";
+
+service ImageInputService {
+  rpc SendImageToFaceService(ImageToFaceServiceRequest) returns (DoneFlagToImageInputServiceResponse);
+}

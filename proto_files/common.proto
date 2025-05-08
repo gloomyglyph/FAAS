@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package face_aggregation;
+
+message Point2D {
+  float x = 1;
+  float y = 2;
+}
+
+message Point3D {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message FaceResult {
+  repeated float bbox = 1;
+  repeated Point2D landmark_2d_106 = 2;
+  repeated Point3D landmark_3d_68 = 3;
+  int32 age = 4;
+  string gender = 5;
+}
+
+message FaceResultRequest {
+  string image_id = 1;
+  bytes image_data = 2;
+  repeated FaceResult face_results = 3;
+}
+
+message DoneFlagToFaceAnalysisServiceResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message ImageToFaceServiceRequest {
+  bytes image_data = 1;
+  string image_id = 2;
+}
+
+message DoneFlagToImageInputServiceResponse {
+  bool success = 1;
+  string error_message = 2;
+}
