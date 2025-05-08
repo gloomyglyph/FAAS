@@ -1,4 +1,5 @@
 import grpc
+import argparse
 from concurrent import futures
 from image_processor import ImageProcessor
 import common_pb2
@@ -12,8 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class FaceAnalysisService(face_analysis_pb2_grpc.FaceAnalysisServiceServicer):
-    def __init__(self):
+    def __init__(self, storage_address):
         self.img_processor = ImageProcessor()
+        self.storage_address = storage_address
 
     def convert_to_face_results(self, face_dicts):
         """Convert a list of face detection dictionaries to common_pb2.FaceResult objects."""
@@ -55,7 +57,7 @@ class FaceAnalysisService(face_analysis_pb2_grpc.FaceAnalysisServiceServicer):
             face_results = self.convert_to_face_results(face_dicts)
 
             # Send result to Data Storage Service (C)
-            with grpc.insecure_channel("localhost:50053") as channel:
+            with grpc.insecure_channel(self.storage_address) as channel:
                 stub = data_storage_pb2_grpc.DataStorageServiceStub(channel)
                 response = stub.StoreFaceResult(
                     common_pb2.FaceResultRequest(
@@ -86,16 +88,30 @@ class FaceAnalysisService(face_analysis_pb2_grpc.FaceAnalysisServiceServicer):
             )
 
 
-def serve():
+def serve(bind_address, storage_address):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     face_analysis_pb2_grpc.add_FaceAnalysisServiceServicer_to_server(
-        FaceAnalysisService(), server
+        FaceAnalysisService(storage_address), server
     )
-    server.add_insecure_port("[::]:50052")
-    logger.info("Face Analysis Service starting on port 50052...")
+    server.add_insecure_port(bind_address)
+    logger.info(f"Face Analysis Service starting on {bind_address}...")
     server.start()
     server.wait_for_termination()
 
 
 if __name__ == "__main__":
-    serve()
+    parser = argparse.ArgumentParser(description="Run Face Analysis Service")
+    parser.add_argument(
+        "--address",
+        type=str,
+        default="[::]:50052",
+        help="IP address and port to bind the server to (default: [::]:50052)",
+    )
+    parser.add_argument(
+        "--storage_address",
+        type=str,
+        default="localhost:50053",
+        help="Address of the Data Storage Service (default: localhost:50053)",
+    )
+    args = parser.parse_args()
+    serve(args.address, args.storage_address)
