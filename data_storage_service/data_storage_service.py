@@ -12,6 +12,7 @@ import common_pb2
 import json
 from bson import json_util
 import hashlib
+import argparse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -54,29 +55,17 @@ def convert_face_results_to_json(face_results):
     """Convert FaceResult messages to JSON-serializable format."""
     json_face_results = []
     for fr in face_results:
-        # Convert bbox to list of floats
         bbox = [float(x) for x in fr.bbox]
+        landmarks_2d = [{"x": float(lm.x), "y": float(lm.y)} for lm in fr.landmark_2d_106]
+        landmarks_3d = [{"x": float(lm.x), "y": float(lm.y), "z": float(lm.z)} for lm in fr.landmark_3d_68]
 
-        # Convert landmark_2d_106 to list of dicts
-        landmarks_2d = [
-            {"x": float(lm.x), "y": float(lm.y)} for lm in fr.landmark_2d_106
-        ]
-
-        # Convert landmark_3d_68 to list of dicts
-        landmarks_3d = [
-            {"x": float(lm.x), "y": float(lm.y), "z": float(lm.z)}
-            for lm in fr.landmark_3d_68
-        ]
-
-        json_face_results.append(
-            {
-                "bbox": bbox,
-                "landmark_2d_106": landmarks_2d,
-                "landmark_3d_68": landmarks_3d,
-                "age": int(fr.age),
-                "gender": fr.gender,
-            }
-        )
+        json_face_results.append({
+            "bbox": bbox,
+            "landmark_2d_106": landmarks_2d,
+            "landmark_3d_68": landmarks_3d,
+            "age": int(fr.age),
+            "gender": fr.gender,
+        })
     return json_face_results
 
 
@@ -104,7 +93,6 @@ def prepare_and_validate_document(image_id, gridfs_id, image_hash, face_results)
 def store_in_redis(redis_client, image_hash, document):
     """Store document in Redis with image_hash as the key."""
     try:
-        # Serialize document to JSON
         json_data = json.dumps(document, default=json_util.default)
         redis_client.set(image_hash, json_data)
         logger.info(f"Stored document in Redis with key: {image_hash}")
@@ -119,16 +107,16 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
         self.client = MongoClient("mongodb://localhost:27017/")
         self.db = self.client["face_analysis_db"]
         self.fs = GridFS(self.db)
+
         # Initialize Redis client
-        self.redis_client = redis.Redis(
-            host="localhost", port=6379, db=0, decode_responses=True
-        )
+        self.redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
         try:
             self.redis_client.ping()
             logger.info("Connected to Redis")
         except redis.ConnectionError as e:
             logger.error(f"Failed to connect to Redis: {str(e)}")
             raise
+
         logger.info("Connected to MongoDB")
 
     def StoreFaceResult(self, request, context):
@@ -164,17 +152,12 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
             # Store document in Redis
             redis_error = store_in_redis(self.redis_client, image_hash, document)
             if redis_error:
-                # Log error but don't fail the request, as MongoDB storage succeeded
                 logger.warning(f"Proceeding despite Redis error: {redis_error}")
 
-            return common_pb2.DoneFlagToFaceAnalysisServiceResponse(
-                success=True, error_message=""
-            )
+            return common_pb2.DoneFlagToFaceAnalysisServiceResponse(success=True, error_message="")
 
         except Exception as e:
-            logger.error(
-                f"Error storing face result for image ID: {image_id}: {str(e)}"
-            )
+            logger.error(f"Error storing face result for image ID: {image_id}: {str(e)}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f"Error storing face result: {str(e)}")
             return common_pb2.DoneFlagToFaceAnalysisServiceResponse(
@@ -182,25 +165,27 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
             )
 
 
-def serve():
-    default_port = 50053
-    try:
-        port = find_available_port(default_port)
-        if port != default_port:
-            logger.warning(f"Port {default_port} is in use, using port {port} instead.")
+def serve(host: str, port: int):
+    """Start the gRPC server with specified host and port."""
+    if is_port_in_use(port):
+        port = find_available_port(port)
+        logger.warning(f"Port is in use, using alternative available port: {port}")
 
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        data_storage_pb2_grpc.add_DataStorageServiceServicer_to_server(
-            DataStorageServicer(), server
-        )
-        server.add_insecure_port(f"[::]:{port}")
-        logger.info(f"Data Storage Service starting on port {port}...")
-        server.start()
-        server.wait_for_termination()
-    except Exception as e:
-        logger.error(f"Failed to start server: {str(e)}")
-        raise
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    data_storage_pb2_grpc.add_DataStorageServiceServicer_to_server(
+        DataStorageServicer(), server
+    )
+    server.add_insecure_port(f"{host}:{port}")
+    logger.info(f"Data Storage Service starting on {host}:{port}...")
+    server.start()
+    server.wait_for_termination()
 
 
 if __name__ == "__main__":
-    serve()
+    # Parse optional arguments for host and port
+    parser = argparse.ArgumentParser(description="Start gRPC Data Storage Service")
+    parser.add_argument("--host", type=str, default="localhost", help="Host to run the server on")
+    parser.add_argument("--port", type=int, default=50053, help="Port to run the server on")
+    args = parser.parse_args()
+
+    serve(args.host, args.port)
