@@ -3,6 +3,7 @@ import os
 import sys
 import asyncio
 import grpc
+import argparse
 
 # Add the proto_generated folder to the Python path
 sys.path.append(os.path.abspath("./proto_files"))
@@ -38,7 +39,7 @@ async def send_image(stub, image_path):
     except Exception as e:
         logger.error(f"Error sending {image_path}: {str(e)}")
 
-async def run():
+async def run(image_input_address):
     """Read all images from a directory and send them simultaneously."""
     image_dir = "./data/"  # Directory containing images
     try:
@@ -60,7 +61,7 @@ async def run():
         logger.info(f"Found {len(image_paths)} images in {image_dir}")
         
         # Create async gRPC channel and stub
-        async with grpc.aio.insecure_channel("localhost:50051") as channel:
+        async with grpc.aio.insecure_channel(image_input_address) as channel:
             stub = image_input_pb2_grpc.ImageInputServiceStub(channel)
             # Send all images concurrently
             tasks = [send_image(stub, str(image_path)) for image_path in image_paths]
@@ -70,4 +71,15 @@ async def run():
         logger.error(f"Client error: {str(e)}")
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    # Set up argument parsing for dynamic address and port
+    parser = argparse.ArgumentParser(description="Test client for ImageInputService")
+    parser.add_argument(
+        "--image_input_address", 
+        type=str, 
+        default="localhost:50051", 
+        help="Address of the Image Input Service (default: localhost:50051)"
+    )
+    args = parser.parse_args()
+    
+    # Run the test client with the provided or default address
+    asyncio.run(run(args.image_input_address))

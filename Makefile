@@ -102,13 +102,18 @@ proto: ## Generate gRPC files and copy to services
 
 test: ## Run tests
 	@echo "Running tests..."
-	@echo "Starting DataStorageService in background..."
-	@python data_storage_service/data_storage_service.py &
-	@echo "Starting FaceAnalysisService in background..."
-	@python face_analysis_service/face_analysis_service.py &
-	@echo "Starting ImageInputService in background..."
-	@python image_input_service/image_input_service.py &
+	@echo "Starting DataStorageService on port 60050 in background..."
+	@python data_storage_service/data_storage_service.py --host localhost --port 60050 &
+
+	@echo "Starting FaceAnalysisService on port 60052 in background..."
+	@python face_analysis_service/face_analysis_service.py --address [::]:60052 --storage_address localhost:60050 &
+
+	@echo "Starting ImageInputService on port 60053 in background..."
+	@python image_input_service/image_input_service.py --face_analysis_address localhost:60052 --image_input_port 60053 &
+
 	@sleep 5  # Give services time to start
 	@echo "Running DataStorageService test client..."
-	@python tests/test_client.py
+	@python tests/test_client.py --image_input_address localhost:60053
 	@echo "Testing complete."
+
+
