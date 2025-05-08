@@ -58,8 +58,8 @@ def generate_protos():
 
         # List of generated files
         generated_files = [
-            f for f in os.listdir(temp_dir) if f.endswith(("_pb2.py", "_pb2_grpc.py"))
-        ]
+            f for f in os.listdir(temp_dir) if f.endswith(
+                ("_pb2.py", "_pb2_grpc.py"))]
         logger.info(f"Generated files: {generated_files}")
 
         # Copy generated files to each microservice's proto_files directory
