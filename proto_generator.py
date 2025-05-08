@@ -8,6 +8,7 @@ from grpc_tools import protoc
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def generate_protos():
     """Generate Protobuf files and copy them to microservice proto_files directories."""
     # Define paths
@@ -19,7 +20,7 @@ def generate_protos():
     microservices = [
         os.path.join(base_dir, "data_storage_service"),
         os.path.join(base_dir, "face_analysis_service"),
-        os.path.join(base_dir, "image_input_service")
+        os.path.join(base_dir, "image_input_service"),
     ]
 
     # Proto files to compile
@@ -27,7 +28,7 @@ def generate_protos():
         "common.proto",
         "data_storage.proto",
         "face_analysis.proto",
-        "image_input.proto"
+        "image_input.proto",
     ]
 
     try:
@@ -43,20 +44,21 @@ def generate_protos():
 
             logger.info(f"Compiling {proto_file}...")
             # Run protoc command
-            result = protoc.main([
-                "grpc_tools.protoc",
-                f"-I{proto_dir}",
-                f"--python_out={temp_dir}",
-                f"--grpc_python_out={temp_dir}",
-                proto_path
-            ])
+            result = protoc.main(
+                [
+                    "grpc_tools.protoc",
+                    f"-I{proto_dir}",
+                    f"--python_out={temp_dir}",
+                    f"--grpc_python_out={temp_dir}",
+                    proto_path,
+                ]
+            )
             if result != 0:
                 raise RuntimeError(f"Failed to compile {proto_file}")
 
         # List of generated files
         generated_files = [
-            f for f in os.listdir(temp_dir)
-            if f.endswith(("_pb2.py", "_pb2_grpc.py"))
+            f for f in os.listdir(temp_dir) if f.endswith(("_pb2.py", "_pb2_grpc.py"))
         ]
         logger.info(f"Generated files: {generated_files}")
 
@@ -83,5 +85,6 @@ def generate_protos():
             shutil.rmtree(temp_dir)
             logger.info(f"Removed temporary directory: {temp_dir}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     generate_protos()

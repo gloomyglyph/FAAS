@@ -3,6 +3,14 @@
 # Define source directories (hardcoded)
 DIRS := . image_input_service face_analysis_service data_storage_service proto_files
 
+# Define proto files directory
+PROTO_DIR := proto_files
+
+# Define output directories for generated Python files
+IMAGE_INPUT_PROTO_OUT := image_input_service/proto_generated
+FACE_ANALYSIS_PROTO_OUT := face_analysis_service/proto_generated
+DATA_STORAGE_PROTO_OUT := data_storage_service/proto_generated
+
 # Define formatting tool (e.g., autopep8, black)
 FORMATTER := black
 
@@ -37,9 +45,9 @@ else
 endif
 
 # Targets
-.PHONY: all format clean cleanall install venv help
+.PHONY: all format clean cleanall install venv help proto
 
-all: format install # add install
+all: format install proto  # add proto
 
 format: ## Format the code in all directories
 	@echo "Formatting code in all directories..."
@@ -87,3 +95,7 @@ venv: ## Create a virtual environment
 
 help: ## Display this help message
 	@$(MAKE) -pRrq : | awk -v RS= -F: '/^# File[^.]*Makefile$$/ {getline;while($$0 !~ /^$$/) {print substr($$0,3);getline}}'
+
+proto: ## Generate gRPC files and copy to services
+	@echo "Generating gRPC files and copying..."
+	@python proto_generator.py
