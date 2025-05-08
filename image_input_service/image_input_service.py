@@ -22,14 +22,14 @@ class ImageInputService(image_input_pb2_grpc.ImageInputServiceServicer):
                 stub = face_analysis_pb2_grpc.FaceAnalysisServiceStub(channel)
                 response = stub.ReceiveImage(
                     common_pb2.ImageToFaceServiceRequest(
-                        image_data=request.image_data,
-                        image_id=request.image_id))
+                        image_data=request.image_data, image_id=request.image_id
+                    )
+                )
             return common_pb2.DoneFlagToImageInputServiceResponse(
                 success=response.success, error_message=response.error_message
             )
         except Exception as e:
-            logger.error(
-                f"Error forwarding image {request.image_id}: {str(e)}")
+            logger.error(f"Error forwarding image {request.image_id}: {str(e)}")
             return common_pb2.DoneFlagToImageInputServiceResponse(
                 success=False, error_message=str(e)
             )
