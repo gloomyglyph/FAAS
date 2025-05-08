@@ -99,3 +99,16 @@ help: ## Display this help message
 proto: ## Generate gRPC files and copy to services
 	@echo "Generating gRPC files and copying..."
 	@python proto_generator.py
+
+test: ## Run tests
+	@echo "Running tests..."
+	@echo "Starting DataStorageService in background..."
+	@python data_storage_service/data_storage_service.py &
+	@echo "Starting FaceAnalysisService in background..."
+	@python face_analysis_service/face_analysis_service.py &
+	@echo "Starting ImageInputService in background..."
+	@python image_input_service/image_input_service.py &
+	@sleep 5  # Give services time to start
+	@echo "Running DataStorageService test client..."
+	@python tests/test_client.py
+	@echo "Testing complete."
