@@ -1,0 +1,26 @@
+# Code formatting and linting tools
+flake8
+autopep8
+black
+
+# Testing framework
+pytest
+
+# Image processing and computer vision
+opencv-python
+numpy
+
+# InsightFace for face analysis
+insightface
+
+# ONNX runtime for model inference
+onnxruntime
+
+# Requests for HTTP requests
+requests
+
+# gRPC
+grpcio
+grpcio-tools
+protobuf
+
