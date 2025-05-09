@@ -103,7 +103,6 @@ FAAS/
 - **Python**: Python 3.9+ (for `Makefile` and `test_client.py`).
 - **Make**: GNU Make for automation.
 - **Git**: Optional for cloning.
-- **Hardware**: 8GB RAM, 10GB disk space.
 
 ## Installation
 
@@ -352,6 +351,3 @@ Each `Dockerfile` extends `my-python-base`:
 
 MIT License. See [LICENSE](LICENSE).
 
-## Contact
-
-[your-email@example.com]
