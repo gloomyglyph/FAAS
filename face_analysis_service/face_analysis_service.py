@@ -13,9 +13,11 @@ import hashlib
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def compute_image_hash(image_data):
     """Compute SHA-256 hash of the image data."""
     return hashlib.sha256(image_data).hexdigest()
+
 
 class FaceAnalysisService(face_analysis_pb2_grpc.FaceAnalysisServiceServicer):
     def __init__(self, storage_address, redis_host, redis_port):
@@ -23,10 +25,7 @@ class FaceAnalysisService(face_analysis_pb2_grpc.FaceAnalysisServiceServicer):
         self.storage_address = storage_address
         # Initialize Redis client
         self.redis_client = redis.Redis(
-            host=redis_host,
-            port=redis_port,
-            db=0,
-            decode_responses=True
+            host=redis_host, port=redis_port, db=0, decode_responses=True
         )
         try:
             self.redis_client.ping()
@@ -73,10 +72,11 @@ class FaceAnalysisService(face_analysis_pb2_grpc.FaceAnalysisServiceServicer):
 
             # Check Redis for existing hash
             if self.check_redis_for_hash(image_hash):
-                logger.info(f"Image ID: {request.image_id} already processed (hash found in Redis)")
+                logger.info(
+                    f"Image ID: {request.image_id} already processed (hash found in Redis)"
+                )
                 return common_pb2.DoneFlagToImageInputServiceResponse(
-                    success=True,
-                    error_message=""
+                    success=True, error_message=""
                 )
 
             # Process image using InsightFace
@@ -110,23 +110,21 @@ class FaceAnalysisService(face_analysis_pb2_grpc.FaceAnalysisServiceServicer):
                     f"Successfully stored result for image ID: {request.image_id}"
                 )
                 return common_pb2.DoneFlagToImageInputServiceResponse(
-                    success=True,
-                    error_message=""
+                    success=True, error_message=""
                 )
             else:
                 logger.error(
                     f"Failed to store result for image ID: {request.image_id}: {response.error_message}"
                 )
                 return common_pb2.DoneFlagToImageInputServiceResponse(
-                    success=False,
-                    error_message=response.error_message
+                    success=False, error_message=response.error_message
                 )
         except Exception as e:
             logger.error(f"Error processing image {request.image_id}: {str(e)}")
             return common_pb2.DoneFlagToImageInputServiceResponse(
-                success=False,
-                error_message=str(e)
+                success=False, error_message=str(e)
             )
+
 
 def serve(bind_address, storage_address, redis_host, redis_port):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -137,6 +135,7 @@ def serve(bind_address, storage_address, redis_host, redis_port):
     logger.info(f"Face Analysis Service starting on {bind_address}...")
     server.start()
     server.wait_for_termination()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Face Analysis Service")

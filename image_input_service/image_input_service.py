@@ -7,6 +7,7 @@ import common_pb2
 from concurrent import futures
 import uuid
 import argparse
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -85,13 +86,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--face_analysis_address",
         type=str,
-        default="localhost:50052",
+        default=os.getenv("FACE_ANALYSIS_ADDRESS", "localhost:50052"),
         help="Address of the Face Analysis Service (default: localhost:50052)",
     )
     parser.add_argument(
         "--image_input_port",
         type=str,
-        default="50051",
+        default=os.getenv("GRPC_PORT", "50051"),
         help="Port to run the Image Input Service on (default: 50051)",
     )
     args = parser.parse_args()
