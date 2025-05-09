@@ -1,0 +1,34 @@
+# Use custom Python base image (assumed to have Python 3.9 and basic tools)
+FROM my-python-base
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements file from image_input_service directory
+COPY image_input_service/requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy service code from image_input_service directory
+COPY image_input_service/image_input_service.py .
+
+# Copy required Protobuf files from proto_files directory
+COPY proto_files/common_pb2.py .
+COPY proto_files/image_input_pb2_grpc.py .
+COPY proto_files/face_analysis_pb2_grpc.py .
+
+# Expose the default port
+EXPOSE 50051
+
+# Set environment variables for gRPC and face analysis address (can be overridden)
+ENV GRPC_PORT=50051
+ENV FACE_ANALYSIS_ADDRESS=face-analysis-service:50052
+
+# Run the service
+CMD ["sh", "-c", "python image_input_service.py --face_analysis_address ${FACE_ANALYSIS_ADDRESS} --image_input_port ${GRPC_PORT}"]
