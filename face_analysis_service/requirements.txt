@@ -24,3 +24,5 @@ grpcio
 grpcio-tools
 protobuf
 
+# For connecting to Redis
+redis
