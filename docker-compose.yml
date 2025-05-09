@@ -1,0 +1,78 @@
+services:
+  base:
+    build:
+      context: .
+      dockerfile: Dockerfile.Base
+    image: my-python-base
+
+  data-storage-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.data_storage_service
+    image: data-storage-service
+    ports:
+      - "50053:50053"
+    environment:
+      - MONGO_HOST=${MONGO_HOST:-host.docker.internal}
+      - MONGO_PORT=${MONGO_PORT:-27017}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - GRPC_HOST=${GRPC_HOST:-0.0.0.0}
+      - GRPC_PORT=${GRPC_PORT:-50053}
+    depends_on:
+      - base
+      - redis
+    networks:
+      - faas-network
+
+  face-analysis-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.face_analysis_service
+    image: face-analysis-service-2
+    ports:
+      - "50052:50052"
+    environment:
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - GRPC_HOST=${GRPC_HOST:-0.0.0.0}
+      - GRPC_PORT=${GRPC_PORT:-50052}
+      - STORAGE_ADDRESS=${STORAGE_ADDRESS:-data-storage-service:50053}
+    depends_on:
+      - base
+      - data-storage-service
+      - redis
+    networks:
+      - faas-network
+
+  image-input-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.image_input_service
+    image: image-input-service
+    ports:
+      - "50051:50051"
+    environment:
+      - GRPC_PORT=${GRPC_PORT:-50051}
+      - FACE_ANALYSIS_ADDRESS=${FACE_ANALYSIS_ADDRESS:-face-analysis-service:50052}
+    depends_on:
+      - base
+      - face-analysis-service
+    networks:
+      - faas-network
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - faas-network
+
+networks:
+  faas-network:
+    driver: bridge
+
+volumes:
+  redis_data:
