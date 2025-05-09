@@ -56,16 +56,23 @@ def convert_face_results_to_json(face_results):
     json_face_results = []
     for fr in face_results:
         bbox = [float(x) for x in fr.bbox]
-        landmarks_2d = [{"x": float(lm.x), "y": float(lm.y)} for lm in fr.landmark_2d_106]
-        landmarks_3d = [{"x": float(lm.x), "y": float(lm.y), "z": float(lm.z)} for lm in fr.landmark_3d_68]
+        landmarks_2d = [
+            {"x": float(lm.x), "y": float(lm.y)} for lm in fr.landmark_2d_106
+        ]
+        landmarks_3d = [
+            {"x": float(lm.x), "y": float(lm.y), "z": float(lm.z)}
+            for lm in fr.landmark_3d_68
+        ]
 
-        json_face_results.append({
-            "bbox": bbox,
-            "landmark_2d_106": landmarks_2d,
-            "landmark_3d_68": landmarks_3d,
-            "age": int(fr.age),
-            "gender": fr.gender,
-        })
+        json_face_results.append(
+            {
+                "bbox": bbox,
+                "landmark_2d_106": landmarks_2d,
+                "landmark_3d_68": landmarks_3d,
+                "age": int(fr.age),
+                "gender": fr.gender,
+            }
+        )
     return json_face_results
 
 
@@ -103,13 +110,15 @@ def store_in_redis(redis_client, image_hash, document):
 
 
 class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
-    def __init__(self):
-        self.client = MongoClient("mongodb://localhost:27017/")
+    def __init__(self, mongo_host="localhost", mongo_port=27017):
+        self.client = MongoClient(f"mongodb://{mongo_host}:{mongo_port}/")
         self.db = self.client["face_analysis_db"]
         self.fs = GridFS(self.db)
 
         # Initialize Redis client
-        self.redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+        self.redis_client = redis.Redis(
+            host="localhost", port=6379, db=0, decode_responses=True
+        )
         try:
             self.redis_client.ping()
             logger.info("Connected to Redis")
@@ -117,7 +126,7 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
             logger.error(f"Failed to connect to Redis: {str(e)}")
             raise
 
-        logger.info("Connected to MongoDB")
+        logger.info(f"Connected to MongoDB at {mongo_host}:{mongo_port}")
 
     def StoreFaceResult(self, request, context):
         try:
@@ -154,10 +163,14 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
             if redis_error:
                 logger.warning(f"Proceeding despite Redis error: {redis_error}")
 
-            return common_pb2.DoneFlagToFaceAnalysisServiceResponse(success=True, error_message="")
+            return common_pb2.DoneFlagToFaceAnalysisServiceResponse(
+                success=True, error_message=""
+            )
 
         except Exception as e:
-            logger.error(f"Error storing face result for image ID: {image_id}: {str(e)}")
+            logger.error(
+                f"Error storing face result for image ID: {image_id}: {str(e)}"
+            )
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f"Error storing face result: {str(e)}")
             return common_pb2.DoneFlagToFaceAnalysisServiceResponse(
@@ -165,15 +178,14 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
             )
 
 
-def serve(host: str, port: int):
-    """Start the gRPC server with specified host and port."""
+def serve(host: str, port: int, mongo_host: str, mongo_port: int):
     if is_port_in_use(port):
         port = find_available_port(port)
         logger.warning(f"Port is in use, using alternative available port: {port}")
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     data_storage_pb2_grpc.add_DataStorageServiceServicer_to_server(
-        DataStorageServicer(), server
+        DataStorageServicer(mongo_host=mongo_host, mongo_port=mongo_port), server
     )
     server.add_insecure_port(f"{host}:{port}")
     logger.info(f"Data Storage Service starting on {host}:{port}...")
@@ -182,10 +194,17 @@ def serve(host: str, port: int):
 
 
 if __name__ == "__main__":
-    # Parse optional arguments for host and port
     parser = argparse.ArgumentParser(description="Start gRPC Data Storage Service")
-    parser.add_argument("--host", type=str, default="localhost", help="Host to run the server on")
-    parser.add_argument("--port", type=int, default=50053, help="Port to run the server on")
+    parser.add_argument(
+        "--host", type=str, default="localhost", help="Host to run the server on"
+    )
+    parser.add_argument(
+        "--port", type=int, default=50053, help="Port to run the server on"
+    )
+    parser.add_argument(
+        "--mongo-host", type=str, default="localhost", help="MongoDB host"
+    )
+    parser.add_argument("--mongo-port", type=int, default=27017, help="MongoDB port")
     args = parser.parse_args()
 
-    serve(args.host, args.port)
+    serve(args.host, args.port, args.mongo_host, args.mongo_port)
