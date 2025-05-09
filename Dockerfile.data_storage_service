@@ -1,0 +1,37 @@
+# Use official Python slim image for a smaller footprint
+FROM my-python-base
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements file from data_storage_service directory
+COPY data_storage_service/requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy service code from data_storage_service directory
+COPY data_storage_service/data_storage_service.py .
+
+# Copy required Protobuf files from proto_files directory
+COPY proto_files/common_pb2.py .
+COPY proto_files/data_storage_pb2.py .
+COPY proto_files/data_storage_pb2_grpc.py .
+
+# Expose the default port
+EXPOSE 50053
+
+# Set environment variables for MongoDB and Redis (can be overridden)
+ENV MONGO_HOST=mongodb
+ENV MONGO_PORT=27017
+ENV REDIS_HOST=redis
+ENV REDIS_PORT=6379
+ENV GRPC_HOST=0.0.0.0
+ENV GRPC_PORT=50053
+
+# Run the service
+CMD ["sh", "-c", "python data_storage_service.py --host $GRPC_HOST --port $GRPC_PORT --mongo-host $MONGO_HOST --mongo-port $MONGO_PORT"]
