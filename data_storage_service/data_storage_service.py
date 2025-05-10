@@ -97,15 +97,15 @@ def prepare_and_validate_document(image_id, image_hash, results, result_type):
         logger.error(f"Document validation failed: {str(e)}")
         return None, str(e)
 
-def store_in_redis(redis_client, image_hash, document):
-    """Store document in Redis with image_hash as the key."""
+def store_in_redis(redis_client, image_hash, result_type, results):
+    """Store analysis results in a Redis hash with image_hash as the key and result_type as the field."""
     try:
-        json_data = json.dumps(document, default=json_util.default)
-        redis_client.set(image_hash, json_data)
-        logger.info(f"Stored document in Redis with key: {image_hash}")
+        json_data = json.dumps(results, default=json_util.default)
+        redis_client.hset(image_hash, result_type, json_data)
+        logger.info(f"Stored {result_type} results in Redis hash with key: {image_hash}")
         return None
     except redis.RedisError as e:
-        logger.error(f"Failed to store document in Redis: {str(e)}")
+        logger.error(f"Failed to store {result_type} results in Redis: {str(e)}")
         return str(e)
 
 class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
@@ -157,7 +157,7 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
             return
         self.db.face_results.insert_one(document)
         logger.info(f"Stored face result for image ID: {image_id}")
-        redis_error = store_in_redis(self.redis_client, image_hash, document)
+        redis_error = store_in_redis(self.redis_client, image_hash, "face_results", json_face_results)
         if redis_error:
             logger.warning(f"Proceeding despite Redis error: {redis_error}")
 
@@ -176,7 +176,7 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
             return
         self.db.agender_results.insert_one(document)
         logger.info(f"Stored agender result for image ID: {image_id}")
-        redis_error = store_in_redis(self.redis_client, image_hash, document)
+        redis_error = store_in_redis(self.redis_client, image_hash, "agender_results", json_agender_results)
         if redis_error:
             logger.warning(f"Proceeding despite Redis error: {redis_error}")
 
