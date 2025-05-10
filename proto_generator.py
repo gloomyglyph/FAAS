@@ -20,6 +20,7 @@ def generate_protos():
     microservices = [
         os.path.join(base_dir, "data_storage_service"),
         os.path.join(base_dir, "face_analysis_service"),
+        os.path.join(base_dir, "agender_analysis_service"),
         os.path.join(base_dir, "image_input_service"),
     ]
 
@@ -28,6 +29,7 @@ def generate_protos():
         "common.proto",
         "data_storage.proto",
         "face_analysis.proto",
+        "agender_analysis.proto",
         "image_input.proto",
     ]
 

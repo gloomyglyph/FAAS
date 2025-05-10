@@ -1,7 +1,7 @@
 # Makefile
 
 # Define source directories (hardcoded)
-DIRS := . image_input_service face_analysis_service data_storage_service proto_files
+DIRS := . image_input_service face_analysis_service agender_analysis_service data_storage_service proto_files
 
 # Define proto files directory
 PROTO_DIR := proto_files
@@ -9,6 +9,7 @@ PROTO_DIR := proto_files
 # Define output directories for generated Python files
 IMAGE_INPUT_PROTO_OUT := image_input_service/proto_generated
 FACE_ANALYSIS_PROTO_OUT := face_analysis_service/proto_generated
+AGENDER_ANALYSIS_PROTO_OUT := agender_analysis_service/proto_generated
 DATA_STORAGE_PROTO_OUT := data_storage_service/proto_generated
 
 # Define formatting tool (e.g., autopep8, black)
