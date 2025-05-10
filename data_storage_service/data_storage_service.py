@@ -1,5 +1,5 @@
 import asyncio
-import grpc.aio as grpc
+import grpc.aio
 import logging
 import socket
 import pymongo
@@ -114,6 +114,13 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
         self.db = self.client["face_analysis_db"]
         self.fs = GridFS(self.db)
         self.redis_client = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True)
+        try:
+            self.redis_client.ping()
+            logger.info("Connected to Redis")
+        except redis.ConnectionError as e:
+            logger.error(f"Failed to connect to Redis: {str(e)}")
+            raise
+        logger.info(f"Connected to MongoDB at {mongo_host}:{mongo_port}")
         self.request_queue = asyncio.Queue()
         self._start_queue_processor()
 
