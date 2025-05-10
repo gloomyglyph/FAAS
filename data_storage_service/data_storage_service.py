@@ -46,6 +46,18 @@ def store_image_in_gridfs(gridfs, image_data, image_id):
     logger.info(f"Stored image in GridFS with ID: {gridfs_id}")
     return gridfs_id
 
+def store_image_data(db, gridfs, image_data, image_id, image_hash):
+    """Store image data in GridFS and image_data collection if not already present."""
+    existing_image = db.image_data.find_one({"image_hash": image_hash})
+    if existing_image:
+        logger.info(f"Image hash {image_hash} already exists in image_data collection.")
+        return existing_image["gridfs_id"]
+    else:
+        gridfs_id = store_image_in_gridfs(gridfs, image_data, image_id)
+        db.image_data.insert_one({"image_hash": image_hash, "gridfs_id": gridfs_id})
+        logger.info(f"Stored new image data for hash: {image_hash}")
+        return gridfs_id
+
 def convert_face_results_to_json(face_results):
     """Convert FaceResult messages to JSON-serializable format."""
     json_face_results = []
@@ -70,11 +82,10 @@ def convert_agender_results_to_json(agender_results):
         })
     return json_agender_results
 
-def prepare_and_validate_document(image_id, gridfs_id, image_hash, results, result_type):
-    """Prepare MongoDB document and validate its JSON serializability."""
+def prepare_and_validate_document(image_id, image_hash, results, result_type):
+    """Prepare MongoDB document for analysis results and validate its JSON serializability."""
     document = {
         "image_id": image_id,
-        "gridfs_id": gridfs_id,
         "image_hash": image_hash,
         f"{result_type}_results": results,
     }
@@ -117,10 +128,12 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
             image_data = request.image_data
             image_hash = compute_image_hash(image_data)
             logger.info(f"Computed image hash: {image_hash}")
-            gridfs_id = store_image_in_gridfs(self.fs, image_data, image_id)
+            # Store image data and get gridfs_id (only stores if hash doesn't exist)
+            gridfs_id = store_image_data(self.db, self.fs, image_data, image_id, image_hash)
+            # Store face results separately
             json_face_results = convert_face_results_to_json(request.face_results)
             document, validation_error = prepare_and_validate_document(
-                image_id, gridfs_id, image_hash, json_face_results, "face"
+                image_id, image_hash, json_face_results, "face"
             )
             if validation_error:
                 context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -146,10 +159,12 @@ class DataStorageServicer(data_storage_pb2_grpc.DataStorageServiceServicer):
             image_data = request.image_data
             image_hash = compute_image_hash(image_data)
             logger.info(f"Computed image hash: {image_hash}")
-            gridfs_id = store_image_in_gridfs(self.fs, image_data, image_id)
+            # Store image data and get gridfs_id (only stores if hash doesn't exist)
+            gridfs_id = store_image_data(self.db, self.fs, image_data, image_id, image_hash)
+            # Store agender results separately
             json_agender_results = convert_agender_results_to_json(request.agender_results)
             document, validation_error = prepare_and_validate_document(
-                image_id, gridfs_id, image_hash, json_agender_results, "agender"
+                image_id, image_hash, json_agender_results, "agender"
             )
             if validation_error:
                 context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
