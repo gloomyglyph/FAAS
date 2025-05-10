@@ -1,0 +1,39 @@
+# Use custom Python base image
+FROM my-python-base
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies, similar to face analysis
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements file from agender_analysis_service directory
+COPY agender_analysis_service/requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy service code and image_processor from agender_analysis_service directory
+COPY agender_analysis_service/agender_analysis_service.py .
+COPY agender_analysis_service/image_processor.py .
+
+# Copy required Protobuf files from proto_files directory
+COPY proto_files/common_pb2.py .
+COPY proto_files/agender_analysis_pb2_grpc.py .
+COPY proto_files/data_storage_pb2_grpc.py .
+
+# Expose the default port
+EXPOSE 50054
+
+# Set environment variables for Redis, gRPC, and storage address
+ENV REDIS_HOST=redis
+ENV REDIS_PORT=6379
+ENV GRPC_HOST=0.0.0.0
+ENV GRPC_PORT=50054
+ENV STORAGE_ADDRESS=data-storage-service:50053
+
+# Run the service
+CMD ["sh", "-c", "python agender_analysis_service.py --address ${GRPC_HOST}:${GRPC_PORT} --storage_address ${STORAGE_ADDRESS} --redis_host ${REDIS_HOST} --redis_port ${REDIS_PORT}"]
