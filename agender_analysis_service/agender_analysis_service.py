@@ -13,9 +13,11 @@ import hashlib
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def compute_image_hash(image_data):
     """Compute SHA-256 hash of the image data."""
     return hashlib.sha256(image_data).hexdigest()
+
 
 class AgenderAnalysisService(agender_analysis_pb2_grpc.AgenderAnalysisServiceServicer):
     def __init__(self, storage_address, redis_host, redis_port):
@@ -37,7 +39,9 @@ class AgenderAnalysisService(agender_analysis_pb2_grpc.AgenderAnalysisServiceSer
         try:
             return self.redis_client.hexists(image_hash, "agender_results")
         except redis.RedisError as e:
-            logger.error(f"Error checking Redis for 'agender_results' in hash {image_hash}: {str(e)}")
+            logger.error(
+                f"Error checking Redis for 'agender_results' in hash {image_hash}: {str(e)}"
+            )
             return False
 
     def convert_to_agender_results(self, agender_dicts):
@@ -114,6 +118,7 @@ class AgenderAnalysisService(agender_analysis_pb2_grpc.AgenderAnalysisServiceSer
                 success=False, error_message=str(e)
             )
 
+
 def serve(bind_address, storage_address, redis_host, redis_port):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     agender_analysis_pb2_grpc.add_AgenderAnalysisServiceServicer_to_server(
@@ -123,6 +128,7 @@ def serve(bind_address, storage_address, redis_host, redis_port):
     logger.info(f"Agender Analysis Service starting on {bind_address}...")
     server.start()
     server.wait_for_termination()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Agender Analysis Service")
