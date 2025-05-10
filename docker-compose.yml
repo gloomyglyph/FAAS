@@ -45,6 +45,26 @@ services:
     networks:
       - faas-network
 
+  agender-analysis-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.agender_analysis_service
+    image: agender-analysis-service
+    ports:
+      - "50054:50054"
+    environment:
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - GRPC_HOST=${GRPC_HOST:-0.0.0.0}
+      - GRPC_PORT=${GRPC_PORT:-50054}
+      - STORAGE_ADDRESS=${STORAGE_ADDRESS:-data-storage-service:50053}
+    depends_on:
+      - base
+      - data-storage-service
+      - redis
+    networks:
+      - faas-network
+
   image-input-service:
     build:
       context: .
@@ -55,9 +75,11 @@ services:
     environment:
       - GRPC_PORT=${GRPC_PORT:-50051}
       - FACE_ANALYSIS_ADDRESS=${FACE_ANALYSIS_ADDRESS:-face-analysis-service:50052}
+      - AGENDER_ANALYSIS_ADDRESS=${AGENDER_ANALYSIS_ADDRESS:-agender-analysis-service:50054}
     depends_on:
       - base
       - face-analysis-service
+      - agender-analysis-service
     networks:
       - faas-network
 
