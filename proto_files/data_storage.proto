@@ -6,4 +6,5 @@ import "common.proto";
 
 service DataStorageService {
   rpc StoreFaceResult(FaceResultRequest) returns (DoneFlagToFaceAnalysisServiceResponse);
+  rpc StoreAgenderResult(AgenderResultRequest) returns (DoneFlagToAgenderAnalysisServiceResponse);
 }

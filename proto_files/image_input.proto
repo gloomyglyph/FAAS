@@ -6,4 +6,5 @@ import "common.proto";
 
 service ImageInputService {
   rpc SendImageToFaceService(ImageToFaceServiceRequest) returns (DoneFlagToImageInputServiceResponse);
+  rpc SendImageToAgenderService(ImageToAgenderServiceRequest) returns (DoneFlagToImageInputServiceResponse);
 }
