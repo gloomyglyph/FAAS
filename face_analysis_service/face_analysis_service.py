@@ -56,8 +56,6 @@ class FaceAnalysisService(face_analysis_pb2_grpc.FaceAnalysisServiceServicer):
                     common_pb2.Point3D(x=point[0], y=point[1], z=point[2])
                     for point in face_dict["landmark_3d_68"]
                 ],
-                age=face_dict["age"],
-                gender=face_dict["gender"],
             )
             face_results.append(face_result)
         return face_results

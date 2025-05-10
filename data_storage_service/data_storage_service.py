@@ -69,8 +69,6 @@ def convert_face_results_to_json(face_results):
                 "bbox": bbox,
                 "landmark_2d_106": landmarks_2d,
                 "landmark_3d_68": landmarks_3d,
-                "age": int(fr.age),
-                "gender": fr.gender,
             }
         )
     return json_face_results
