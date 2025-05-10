@@ -22,6 +22,7 @@ COPY image_input_service/image_input_service.py .
 COPY proto_files/common_pb2.py .
 COPY proto_files/image_input_pb2_grpc.py .
 COPY proto_files/face_analysis_pb2_grpc.py .
+COPY proto_files/agender_analysis_pb2_grpc.py .
 
 # Expose the default port
 EXPOSE 50051
