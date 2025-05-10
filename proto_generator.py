@@ -45,7 +45,6 @@ def generate_protos():
                 raise FileNotFoundError(f"Proto file not found: {proto_path}")
 
             logger.info(f"Compiling {proto_file}...")
-            # Run protoc command
             result = protoc.main(
                 [
                     "grpc_tools.protoc",
@@ -64,18 +63,25 @@ def generate_protos():
         ]
         logger.info(f"Generated files: {generated_files}")
 
-        # Copy generated files to each microservice's proto_files directory
+        # Delete old _pb2.py and _pb2_grpc.py files and copy new ones
         for microservice_dir in microservices:
-            proto_files_dir = microservice_dir
-            if not os.path.exists(proto_files_dir):
-                os.makedirs(proto_files_dir)
-                logger.info(f"Created directory: {proto_files_dir}")
+            if not os.path.exists(microservice_dir):
+                os.makedirs(microservice_dir)
+                logger.info(f"Created directory: {microservice_dir}")
 
+            # Delete old generated proto files
+            for file_name in os.listdir(microservice_dir):
+                if file_name.endswith(("_pb2.py", "_pb2_grpc.py")):
+                    file_path = os.path.join(microservice_dir, file_name)
+                    os.remove(file_path)
+                    logger.info(f"Deleted old file: {file_path}")
+
+            # Copy new files
             for gen_file in generated_files:
                 src_path = os.path.join(temp_dir, gen_file)
-                dst_path = os.path.join(proto_files_dir, gen_file)
+                dst_path = os.path.join(microservice_dir, gen_file)
                 shutil.copy2(src_path, dst_path)
-                logger.info(f"Copied {gen_file} to {proto_files_dir}")
+                logger.info(f"Copied {gen_file} to {microservice_dir}")
 
     except Exception as e:
         logger.error(f"Error generating or copying proto files: {str(e)}")
