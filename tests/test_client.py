@@ -76,8 +76,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--image_input_address", 
         type=str, 
-        default="localhost:50051", 
-        help="Address of the Image Input Service (default: localhost:50051)"
+        default=os.getenv("GRPC_PORT_IMAGE_INPUT", "localhost:50051"),
+        help="Address of the Image Input Service (default: localhost:50051)",
     )
     args = parser.parse_args()
     
