@@ -2,11 +2,12 @@
 
 ## Project Concepts
 
-The Face Analysis and Storage System (FAAS) is a distributed microservices application designed to process images, analyze facial features, and store results with high efficiency and scalability. Leveraging gRPC, Docker, Redis, and MongoDB, FAAS provides a robust pipeline for applications like security surveillance, identity verification, or social media analytics.
+The Face Analysis and Storage System (FAAS) is a distributed microservices application designed to process images, analyze facial features, estimate age and gender, and store results with high efficiency and scalability. Leveraging gRPC, Docker, Redis, and MongoDB, FAAS provides a robust pipeline for applications like security surveillance, identity verification, or social media analytics.
 
 ### Purpose 
-FAAS enables real-time image processing and facial analysis with:
-- **Image Analysis**: Detect and extract facial features from images.
+FAAS enables real-time image processing and analysis with:
+- **Facial Analysis**: Detect and extract facial features such as bounding boxes and landmarks.
+- **Age and Gender Estimation**: Analyze images to estimate age and gender.
 - **Scalability**: Microservices allow independent scaling for high-throughput workloads.
 - **Performance**: Redis caching minimizes latency and database load.
 - **Reliability**: MongoDB ensures durable, queryable storage.
@@ -16,43 +17,49 @@ FAAS enables real-time image processing and facial analysis with:
 
 ### Technical Concepts
 FAAS is built on advanced principles:
-- **Microservices**: Three services (`image-input-service`, `face-analysis-service`, `data-storage-service`) handle distinct tasks, enhancing modularity.
-- **gRPC**: High-performance RPC with Protocol Buffers for type-safe, async communication.
+- **Microservices**: Four services (`image-input-service`, `face-analysis-service`, `agender-analysis-service`, `data-storage-service`) handle distinct tasks, enhancing modularity.
+- **gRPC**: High-performance RPC with Protocol Buffers for type-safe, asynchronous communication.
 - **Queue-Based Processing**: Non-blocking request handling for efficient load management.
-- **Caching**: Redis stores temporary results with TTLs to optimize performance.
-- **Persistence**: MongoDB supports structured storage and complex queries.
+- **Caching**: Redis stores temporary results in hashes to optimize performance and prevent overwrites.
+- **Persistence**: MongoDB supports structured storage with separate collections for face and agender results.
 - **Containerization**: Docker ensures consistency, with `my-python-base` optimizing dependencies.
 - **Orchestration**: Docker Compose manages networking and dependencies.
 
 ### Microservices Technical Details
 Each microservice incorporates sophisticated features:
 - **image-input-service**:
-  - **Queue-Based Async Server**: Uses an asynchronous gRPC server with a queue to handle concurrent image requests, ensuring scalability under load.
+  - **Concurrent Async Processing**: Uses an asynchronous gRPC server with a queue to handle concurrent image requests, forwarding to both `face-analysis-service` and `agender-analysis-service` using `asyncio.gather`.
   - **Image Validation**: Checks image formats (JPG, PNG) before forwarding, minimizing errors.
-  - **Minimal Footprint**: Optimized for low-latency routing to `face-analysis-service`.
+  - **Minimal Footprint**: Optimized for low-latency routing to analysis services.
 - **face-analysis-service**:
-  - **InsightFace with ONNX**: Employs `insightface` with pre-trained ONNX models for accurate facial detection and feature extraction.
-  - **Async Processing**: Handles multiple image analyses concurrently via async gRPC.
-  - **Redis Caching**: Stores results with unique keys and TTLs, reducing redundant processing.
+  - **InsightFace with ONNX**: Employs `insightface` with pre-trained ONNX models for accurate facial detection and feature extraction (bounding boxes, 2D/3D landmarks).
+  - **Redis Hash Caching**: Stores face results in a Redis hash under the `face_results` field, using `hexists` to check for existing results.
   - **Robust Error Handling**: Returns detailed gRPC error messages for invalid inputs.
+- **agender-analysis-service**:
+  - **InsightFace for Age/Gender**: Uses `insightface` to estimate age and gender from images, integrated via `image_processor.py`.
+  - **Redis Hash Caching**: Stores agender results in a Redis hash under the `agender_results` field, ensuring independent caching from face results.
+  - **gRPC Integration**: Processes images via gRPC, forwarding results to `data-storage-service`.
 - **data-storage-service**:
-  - **MongoDB Storage**: Persists results in indexed collections for fast querying.
-  - **Redis Metadata Caching**: Caches image metadata (e.g., IDs, timestamps) to reduce MongoDB load.
+  - **MongoDB Storage**: Persists results in three collections: `image_data` (image hashes and GridFS IDs), `face_results`, and `agender_results` for efficient querying.
+  - **Redis Hash Caching**: Caches face and agender results as separate fields in a Redis hash, preventing overwrites.
+  - **Async Queue Processing**: Uses `grpc.aio` and `asyncio.Queue` for concurrent, non-blocking storage operations.
   - **Atomic Writes**: Ensures data consistency with transactional updates.
-  - **Scalable Design**: Supports MongoDB sharding for large-scale datasets.
+  - **Deduplication**: Stores image data only once in GridFS, using `image_data` collection to track unique hashes.
 
 ### Workflow
 1. A client (`test_client.py`) sends images to `image-input-service` via gRPC.
-2. `image-input-service` queues and forwards images to `face-analysis-service`.
-3. `face-analysis-service` analyzes faces, caches results in Redis, and sends data to `data-storage-service`.
-4. `data-storage-service` stores results in MongoDB and caches metadata in Redis.
-5. The client receives a success/failure response.
+2. `image-input-service` queues and concurrently forwards images to `face-analysis-service` and `agender-analysis-service`.
+3. `face-analysis-service` extracts facial features, caches results in Redis under `face_results`, and sends data to `data-storage-service`.
+4. `agender-analysis-service` estimates age and gender, caches results in Redis under `agender_results`, and sends data to `data-storage-service`.
+5. `data-storage-service` stores image data in GridFS (if new), persists results in MongoDB (`face_results` or `agender_results`), and caches metadata in Redis.
+6. The client receives a success/failure response.
 
 ## Architecture
 
-FAAS includes three gRPC-based microservices, a containerized Redis, and a local MongoDB, connected via a Docker bridge network (`faas-network`):
+FAAS includes four gRPC-based microservices, a containerized Redis, and a local MongoDB, connected via a Docker bridge network (`faas-network`):
 - **image-input-service**: Port `50051`, receives and forwards images.
-- **face-analysis-service**: Port `50052`, analyzes faces, caches in Redis.
+- **face-analysis-service**: Port `50052`, analyzes facial features, caches in Redis.
+- **agender-analysis-service**: Port `50054`, estimates age and gender, caches in Redis.
 - **data-storage-service**: Port `50053`, stores results in MongoDB.
 - **Redis**: Port `6379`, caching.
 - **MongoDB**: Local at `host.docker.internal:27017`, persistence.
@@ -67,6 +74,7 @@ FAAS/
 ├── Dockerfile.Base                 # Defines my-python-base image
 ├── Dockerfile.data_storage_service # Dockerfile for data-storage-service
 ├── Dockerfile.face_analysis_service# Dockerfile for face-analysis-service
+├── Dockerfile.agender_analysis_service # Dockerfile for agender-analysis-service
 ├── Dockerfile.image_input_service  # Dockerfile for image-input-service
 ├── docker-compose.yml              # Orchestrates services and Redis
 ├── .env                            # Optional port/host settings
@@ -80,6 +88,10 @@ FAAS/
 │   ├── face_analysis_service.py    # Service code
 │   ├── image_processor.py          # Face analysis logic
 │   ├── requirements.txt            # Dependencies
+├── agender_analysis_service/
+│   ├── agender_analysis_service.py # Service code
+│   ├── image_processor.py          # Age/gender analysis logic
+│   ├── requirements.txt            # Dependencies
 ├── image_input_service/
 │   ├── image_input_service.py      # Service code
 │   ├── requirements.txt            # Dependencies
@@ -89,6 +101,8 @@ FAAS/
 │   ├── data_storage_pb2_grpc.py    # Data storage gRPC stubs
 │   ├── face_analysis_pb2.py        # Face analysis Protobuf
 │   ├── face_analysis_pb2_grpc.py   # Face analysis gRPC stubs
+│   ├── agender_analysis_pb2.py     # Agender analysis Protobuf
+│   ├── agender_analysis_pb2_grpc.py# Agender analysis gRPC stubs
 │   ├── image_input_pb2.py          # Image input Protobuf
 │   ├── image_input_pb2_grpc.py     # Image input gRPC stubs
 ├── tests/
@@ -137,14 +151,14 @@ FAAS/
    ```bash
    make install
    ```
-   Installs `grpcio`, `redis`, `pymongo`, `insightface`, etc., from `requirements.txt` files.
+   Installs `grpcio`, `redis`, `pymongo`, `insightface`, `opencv-python`, etc., from `requirements.txt` files.
 
 5. **Generate Protobuf Files**
    Run `make proto` to generate Protobuf files:
    ```bash
    make proto
    ```
-   Executes `proto_generator.py` to create `*_pb2.py` and `*_pb2_grpc.py` in `proto_files/`.
+   Executes `proto_generator.py` to create `*_pb2.py` and `*_pb2_grpc.py` in `proto_files/`, clearing old files to prevent conflicts.
 
 6. **Create Data Folder**
    Create `data/` and add images (JPG, PNG) for processing:
@@ -159,10 +173,15 @@ Use a `.env` file to customize ports/hosts:
 ```env
 MONGO_HOST=host.docker.internal
 MONGO_PORT=27017
+REDIS_HOST=redis
 REDIS_PORT=6379
 GRPC_PORT_IMAGE_INPUT=50051
 GRPC_PORT_FACE_ANALYSIS=50052
 GRPC_PORT_DATA_STORAGE=50053
+GRPC_PORT_AGENDER_ANALYSIS=50054
+STORAGE_ADDRESS=data-storage-service:50053
+FACE_ANALYSIS_ADDRESS=face-analysis-service:50052
+AGENDER_ANALYSIS_ADDRESS=agender-analysis-service:50054
 ```
 - If ports change (e.g., `GRPC_PORT_IMAGE_INPUT=50551`), update `test_client.py`:
   ```bash
@@ -172,14 +191,14 @@ GRPC_PORT_DATA_STORAGE=50053
 
 ## Makefile Usage
 
-The `Makefile` automates tasks for development and production:
+The `Makefile` automates tasks for development and production, requiring manual `OS_TYPE` setting (`Windows` or `Unix`) for cross-platform compatibility:
 
 ### Development Phase
-- **format**: Formats code using `black` across all directories (`.`, `image_input_service`, `face_analysis_service`, `data_storage_service`, `proto_files`) for consistency.
+- **format**: Formats code using `black` across all directories (`.`, `image_input_service`, `face_analysis_service`, `agender_analysis_service`, `data_storage_service`, `proto_files`).
   ```bash
   make format
   ```
-- **clean**: Applies `autopep8` with aggressive options to clean code, ensuring PEP 8 compliance.
+- **clean**: Applies `autopep8` with aggressive options to ensure PEP 8 compliance.
   ```bash
   make clean
   ```
@@ -187,7 +206,7 @@ The `Makefile` automates tasks for development and production:
   ```bash
   make venv
   ```
-- **test**: Runs services in the background on test ports (`60050`, `60052`, `60053`) and executes `test_client.py` for integration testing.
+- **test**: Runs services on test ports (`60050`, `60052`, `60054`, `60053`), executes `test_client.py`, and cleans up processes.
   ```bash
   make test
   ```
@@ -197,20 +216,18 @@ The `Makefile` automates tasks for development and production:
   ```
 
 ### Production Phase
-- **install**: Installs dependencies from `requirements.txt` files, upgrading `pip` and ensuring production-ready packages.
+- **install**: Installs dependencies from `requirements.txt` files, upgrading `pip`.
   ```bash
   make install
   ```
-- **proto**: Generates Protobuf files using `proto_generator.py`, critical for gRPC communication.
+- **proto**: Generates Protobuf files using `proto_generator.py`, clearing old files.
   ```bash
   make proto
   ```
-- **cleanall**: Removes generated files (`.pyc`, `__pycache__`, `.log`, `.pytest_cache`, `.mypy_cache`) to ensure a clean production environment.
+- **cleanall**: Removes generated files (`.pyc`, `__pycache__`, `.log`, `.pytest_cache`, `.mypy_cache`).
   ```bash
   make cleanall
   ```
-
-The `Makefile` supports cross-platform compatibility (Windows, Linux, macOS) with OS-specific commands (`del` vs. `rm`, etc.).
 
 ## Docker Setup
 
@@ -223,13 +240,13 @@ The `Makefile` supports cross-platform compatibility (Windows, Linux, macOS) wit
 
 ### Service Dockerfiles
 Each `Dockerfile` extends `my-python-base`:
-- Copies service code and Protobuf files.
-- Sets the command to run the service (e.g., `python data_storage_service.py`).
+- Copies service code, `image_processor.py` (for analysis services), and Protobuf files.
+- Sets environment variables and commands (e.g., `python agender_analysis_service.py`).
 
 ### Docker Compose
 `docker-compose.yml` orchestrates:
 - Builds `my-python-base`.
-- Runs services on ports `50051`, `50052`, `50053`.
+- Runs services on ports `50051`, `50052`, `50054`, `50053`.
 - Configures Redis on `6379` with a persistent volume.
 - Uses `faas-network` for communication.
 
@@ -241,9 +258,9 @@ Each `Dockerfile` extends `my-python-base`:
    ```
 
 2. **Check Ports**
-   Ensure `50051`, `50052`, `50053`, `6379` are free:
+   Ensure `50051`, `50052`, `50054`, `50053`, `6379` are free:
    ```bash
-   netstat -a -n -o | findstr "50051 50052 50053 6379"
+   netstat -a -n -o | findstr "50051 50052 50054 50053 6379"
    ```
    Free ports:
    ```bash
@@ -265,6 +282,7 @@ Each `Dockerfile` extends `my-python-base`:
    CONTAINER ID   IMAGE                     COMMAND                  CREATED        STATUS        PORTS                    NAMES
    <id>           image-input-service       "sh -c 'python image…"   <time>         Up <time>     0.0.0.0:50051->50051/tcp faas_image-input-service_1
    <id>           face-analysis-service-2   "sh -c 'python face_…"   <time>         Up <time>     0.0.0.0:50052->50052/tcp faas_face-analysis-service_1
+   <id>           agender-analysis-service  "sh -c 'python agend…"   <time>         Up <time>     0.0.0.0:50054->50054/tcp faas_agender-analysis-service_1
    <id>           data-storage-service      "sh -c 'python data_…"   <time>         Up <time>     0.0.0.0:50053->50053/tcp faas_data-storage-service_1
    <id>           redis                     "docker-entrypoint.s…"   <time>         Up <time>     0.0.0.0:6379->6379/tcp   faas_redis_1
    ```
@@ -273,12 +291,14 @@ Each `Dockerfile` extends `my-python-base`:
    ```bash
    docker-compose logs data-storage-service
    docker-compose logs face-analysis-service
+   docker-compose logs agender-analysis-service
    docker-compose logs image-input-service
    docker-compose logs redis
    ```
    Expected:
    - `data-storage-service`: Connected to MongoDB/Redis, listening on `0.0.0.0:50053`.
    - `face-analysis-service`: Connected to Redis, listening on `0.0.0.0:50052`.
+   - `agender-analysis-service`: Connected to Redis, listening on `0.0.0.0:50054`.
    - `image-input-service`: Listening on `50051`.
    - `redis`: Ready to accept connections.
 
@@ -313,7 +333,7 @@ Each `Dockerfile` extends `my-python-base`:
   - Check port mapping.
   - Allow firewall:
     ```bash
-    netsh advfirewall firewall add rule name="FAAS Ports" dir=in action=allow protocol=TCP localport=50051,50052,50053
+    netsh advfirewall firewall add rule name="FAAS Ports" dir=in action=allow protocol=TCP localport=50051,50052,50054,50053
     ```
 - **MongoDB Issues**:
   - Ensure `localhost:27017`.
@@ -334,11 +354,13 @@ Each `Dockerfile` extends `my-python-base`:
 - **Clean Protobuf Files**:
   ```bash
   cd data_storage_service
-  del face_analysis_pb2.py face_analysis_pb2_grpc.py image_input_pb2.py image_input_pb2_grpc.py
+  del face_analysis_pb2.py face_analysis_pb2_grpc.py image_input_pb2.py image_input_pb2_grpc.py agender_analysis_pb2.py agender_analysis_pb2_grpc.py
   cd ../face_analysis_service
-  del common_pb2.py data_storage_pb2.py data_storage_pb2_grpc.py image_input_pb2.py image_input_pb2_grpc.py
+  del common_pb2.py data_storage_pb2.py data_storage_pb2_grpc.py image_input_pb2.py image_input_pb2_grpc.py agender_analysis_pb2.py agender_analysis_pb2_grpc.py
+  cd ../agender_analysis_service
+  del common_pb2.py data_storage_pb2.py data_storage_pb2_grpc.py face_analysis_pb2.py face_analysis_pb2_grpc.py image_input_pb2.py image_input_pb2_grpc.py
   cd ../image_input_service
-  del common_pb2.py data_storage_pb2.py data_storage_pb2_grpc.py face_analysis_pb2.py face_analysis_pb2_grpc.py
+  del common_pb2.py data_storage_pb2.py data_storage_pb2_grpc.py face_analysis_pb2.py face_analysis_pb2_grpc.py agender_analysis_pb2.py agender_analysis_pb2_grpc.py
   ```
 - **Dockerize test_client.py**:
   Contact maintainer for `Dockerfile.test_client`.
@@ -350,4 +372,3 @@ Each `Dockerfile` extends `my-python-base`:
 ## License
 
 MIT License. See [LICENSE](LICENSE).
-
