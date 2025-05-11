@@ -18,8 +18,9 @@ FAAS enables real-time image processing and analysis with:
 ### Technical Concepts
 FAAS is built on advanced principles:
 - **Microservices**: Four services (`image-input-service`, `face-analysis-service`, `agender-analysis-service`, `data-storage-service`) handle distinct tasks, enhancing modularity.
-- **gRPC**: High-performance RPC with Protocol Buffers for type-safe, asynchronous communication.
-- **Queue-Based Processing**: Non-blocking request handling for efficient load management.
+- **gRPC**: High-performance RPC with Protocol Buffers for type-safe, asynchronous communication using `grpc.aio` for non-blocking operations.
+- **Concurrency and Asynchronous Processing**: Utilizes Python's `asyncio` for asynchronous I/O, enabling concurrent request handling. Services like `image-input-service` and `data-storage-service` use `asyncio.Queue` for non-blocking request queuing, while `grpc.aio` supports async gRPC servers. Thread pools (`concurrent.futures.ThreadPoolExecutor`) are used in synchronous services like `face-analysis-service` for parallel task execution.
+- **Queue-Based Processing**: Non-blocking request handling with `asyncio.Queue` ensures efficient load management and continuous service availability.
 - **Caching**: Redis stores temporary results in hashes to optimize performance and prevent overwrites.
 - **Persistence**: MongoDB supports structured storage with separate collections for face and agender results.
 - **Containerization**: Docker ensures consistency, with `my-python-base` optimizing dependencies.
@@ -28,21 +29,23 @@ FAAS is built on advanced principles:
 ### Microservices Technical Details
 Each microservice incorporates sophisticated features:
 - **image-input-service**:
-  - **Concurrent Async Processing**: Uses an asynchronous gRPC server with a queue to handle concurrent image requests, forwarding to both `face-analysis-service` and `agender-analysis-service` using `asyncio.gather`.
+  - **Concurrent Async Processing**: Employs an async gRPC server (`grpc.aio`) with `asyncio.Queue` to handle concurrent image requests. Uses `asyncio.gather` to forward images to `face-analysis-service` and `agender-analysis-service` concurrently, ensuring low-latency routing.
   - **Image Validation**: Checks image formats (JPG, PNG) before forwarding, minimizing errors.
-  - **Minimal Footprint**: Optimized for low-latency routing to analysis services.
+  - **Minimal Footprint**: Optimized for efficient request queuing and forwarding.
 - **face-analysis-service**:
-  - **InsightFace with ONNX**: Employs `insightface` with pre-trained ONNX models for accurate facial detection and feature extraction (bounding boxes, 2D/3D landmarks).
+  - **InsightFace with ONNX**: Uses `insightface` with pre-trained ONNX models for accurate facial detection and feature extraction (bounding boxes, 2D/3D landmarks).
+  - **Concurrent Processing**: Utilizes a synchronous gRPC server with a thread pool (`concurrent.futures.ThreadPoolExecutor`) to process multiple image requests in parallel, enhancing throughput.
   - **Redis Hash Caching**: Stores face results in a Redis hash under the `face_results` field, using `hexists` to check for existing results.
   - **Robust Error Handling**: Returns detailed gRPC error messages for invalid inputs.
 - **agender-analysis-service**:
-  - **InsightFace for Age/Gender**: Uses `insightface` to estimate age and gender from images, integrated via `image_processor.py`.
-  - **Redis Hash Caching**: Stores agender results in a Redis hash under the `agender_results` field, ensuring independent caching from face results.
+  - **InsightFace for Age/Gender**: Employs `insightface` to estimate age and gender, integrated via `image_processor.py`.
+  - **Concurrent Processing**: Similar to `face-analysis-service`, uses a thread pool for parallel processing of image requests, ensuring scalability.
+  - **Redis Hash Caching**: Stores agender results in a Redis hash under the `agender_results` field, ensuring independent caching.
   - **gRPC Integration**: Processes images via gRPC, forwarding results to `data-storage-service`.
 - **data-storage-service**:
   - **MongoDB Storage**: Persists results in three collections: `image_data` (image hashes and GridFS IDs), `face_results`, and `agender_results` for efficient querying.
+  - **Async Queue Processing**: Uses an async gRPC server (`grpc.aio`) with `asyncio.Queue` for non-blocking request handling. Offloads synchronous MongoDB/Redis operations to threads via `asyncio.to_thread`, ensuring continuous availability.
   - **Redis Hash Caching**: Caches face and agender results as separate fields in a Redis hash, preventing overwrites.
-  - **Async Queue Processing**: Uses `grpc.aio` and `asyncio.Queue` for concurrent, non-blocking storage operations.
   - **Atomic Writes**: Ensures data consistency with transactional updates.
   - **Deduplication**: Stores image data only once in GridFS, using `image_data` collection to track unique hashes.
 
@@ -216,15 +219,15 @@ The `Makefile` automates tasks for development and production, requiring manual 
   ```
 
 ### Production Phase
-- **install**: Installs dependencies from `requirements.txt` files, upgrading `pip`.
+- **install**: Installs Python dependencies from `requirements.txt` files for local development or testing, but does not build or run Docker containers. For production, follow the steps in **Running the System** to build and deploy services using Docker Compose.
   ```bash
   make install
   ```
-- **proto**: Generates Protobuf files using `proto_generator.py`, clearing old files.
+- **proto**: Generates Protobuf files using `proto_generator.py`. Existing Protobuf files are automatically cleared before generating new ones.
   ```bash
   make proto
   ```
-- **cleanall**: Removes generated files (`.pyc`, `__pycache__`, `.log`, `.pytest_cache`, `.mypy_cache`).
+- **cleanall**: Removes generated files (`.pyc`, `__pycache__`, `.log`, `.pytest_cache`, `.mypy_cache`) to ensure a clean environment.
   ```bash
   make cleanall
   ```
