@@ -29,7 +29,7 @@ ACTIVATE_VENV := source $(VENV_NAME)/bin/activate
 
 # User must set OS_TYPE to 'Windows' or 'Unix' below
 # Example: OS_TYPE := Windows
-OS_TYPE := Windows
+OS_TYPE := Unix
 
 # Validate OS_TYPE
 ifndef OS_TYPE
@@ -117,19 +117,44 @@ proto: ## Generate gRPC files and copy to services
 test: ## Run tests
 	@echo "Cleaning up previous test processes..."
 	@-$(KILL) || echo "No Python processes to kill."
+
 	@echo "Running tests..."
+
+ifeq ($(OS_TYPE),Windows)
 	@echo "Starting DataStorageService on port 60050 in background..."
-	@python data_storage_service/data_storage_service.py --host localhost --port 60050 --mongo-host localhost --mongo-port 27017 --redis-host localhost --redis-port 6379 &
+	@cmd /C "start /B python data_storage_service/data_storage_service.py --host localhost --port 60050 --mongo-host localhost --mongo-port 27017 --redis-host localhost --redis-port 6379"
+
 	@echo "Starting FaceAnalysisService on port 60052 in background..."
-	@python face_analysis_service/face_analysis_service.py --address [::]:60052 --storage_address localhost:60050 --redis_host localhost --redis_port 6379 &
+	@cmd /C "start /B python face_analysis_service/face_analysis_service.py --address [::]:60052 --storage_address localhost:60050 --redis_host localhost --redis_port 6379"
+
 	@echo "Starting AgenderAnalysisService on port 60054 in background..."
-	@python agender_analysis_service/agender_analysis_service.py --address [::]:60054 --storage_address localhost:60050 --redis_host localhost --redis_port 6379 &
+	@cmd /C "start /B python agender_analysis_service/agender_analysis_service.py --address [::]:60054 --storage_address localhost:60050 --redis_host localhost --redis_port 6379"
+
 	@echo "Starting ImageInputService on port 60053 in background..."
-	@python image_input_service/image_input_service.py --face_analysis_address localhost:60052 --agender_analysis_address localhost:60054 --image_input_port 60053 &
-	@echo "Running DataStorageService test client..."
-	@sleep 10  # Give services time to start
+	@cmd /C "start /B python image_input_service/image_input_service.py --face_analysis_address localhost:60052 --agender_analysis_address localhost:60054 --image_input_port 60053"
+
+	@echo "Waiting for services to start..."
+	@timeout /T 10 /NOBREAK > nul
+else
+	@echo "Starting DataStorageService on port 60050 in background..."
+	@python ./data_storage_service/data_storage_service.py --host localhost --port 60050 --mongo-host localhost --mongo-port 27017 --redis-host localhost --redis-port 6379 &
+
+	@echo "Starting FaceAnalysisService on port 60052 in background..."
+	@python ./face_analysis_service/face_analysis_service.py --address [::]:60052 --storage_address localhost:60050 --redis_host localhost --redis_port 6379 &
+
+	@echo "Starting AgenderAnalysisService on port 60054 in background..."
+	@python ./agender_analysis_service/agender_analysis_service.py --address [::]:60054 --storage_address localhost:60050 --redis_host localhost --redis_port 6379 &
+
+	@echo "Starting ImageInputService on port 60053 in background..."
+	@python ./image_input_service/image_input_service.py --face_analysis_address localhost:60052 --agender_analysis_address localhost:60054 --image_input_port 60053 &
+
+	@echo "Waiting for services to start..."
+	@sleep 10
+endif
+
 	@echo "----------All Services Started Successfully----------"
 	@python tests/test_client.py --image_input_address localhost:60053
+
 	@echo "Cleaning up test processes..."
 	@-$(KILL) || echo "No Python processes to kill."
 	@echo "Testing complete."
