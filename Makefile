@@ -84,7 +84,7 @@ install: ## Install dependencies in all directories
 	@for dir in $(DIRS); do \
 		if [ -f "$$dir/requirements.txt" ]; then \
 			echo "Installing dependencies in $$dir from requirements.txt"; \
-			cd "$$dir" && python -m pip install -r requirements.txt; \
+			python -m pip install -r $$dir/requirements.txt; \
 		else \
 			echo "No requirements.txt found in $$dir, skipping"; \
 		fi; \
