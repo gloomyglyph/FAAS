@@ -13,6 +13,7 @@ import json
 from bson import json_util
 import hashlib
 import argparse
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -262,16 +263,29 @@ if __name__ == "__main__":
         "--host", type=str, default="localhost", help="Host to run the server on"
     )
     parser.add_argument(
-        "--port", type=int, default=50053, help="Port to run the server on"
+        "--port",
+        type=int,
+        default=os.getenv("GRPC_PORT_DATA_STORAGE", "50053"),
+        help="Port to run the server on",
     )
     parser.add_argument(
         "--mongo-host", type=str, default="localhost", help="MongoDB host"
     )
-    parser.add_argument("--mongo-port", type=int, default=27017, help="MongoDB port")
+    parser.add_argument(
+        "--mongo-port",
+        type=int,
+        default=os.getenv("MONGO_PORT", "27017"),
+        help="MongoDB port",
+    )
     parser.add_argument(
         "--redis-host", type=str, default="localhost", help="Redis host"
     )
-    parser.add_argument("--redis-port", type=int, default=6379, help="Redis port")
+    parser.add_argument(
+        "--redis-port",
+        type=int,
+        default=os.getenv("REDIS_PORT", "6379"),
+        help="Redis port",
+    )
     args = parser.parse_args()
     asyncio.run(
         serve(

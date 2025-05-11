@@ -97,7 +97,8 @@ class ImageInputService(image_input_pb2_grpc.ImageInputServiceServicer):
             logger.info(
                 f"Received image with ID: {request.image_id} for agender analysis"
             )
-            # Since the queue processes both, we can reuse the same queuing logic
+            # Since the queue processes both, we can reuse the same queuing
+            # logic
             request_id = str(uuid.uuid4())
             self.request_tracker[request_id] = request.image_id
             await self.request_queue.put((request_id, request))

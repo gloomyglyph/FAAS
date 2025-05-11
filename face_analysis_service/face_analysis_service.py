@@ -8,6 +8,7 @@ import data_storage_pb2_grpc
 import logging
 import redis
 import hashlib
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -142,13 +143,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--address",
         type=str,
-        default="[::]:50052",
+        default=os.getenv("FACE_ANALYSIS_ADDRESS", "localhost:50052"),
         help="IP address and port to bind the server to (default: [::]:50052)",
     )
     parser.add_argument(
         "--storage_address",
         type=str,
-        default="localhost:50053",
+        default=os.getenv("GRPC_PORT_DATA_STORAGE", "localhost:50053"),
         help="Address of the Data Storage Service (default: localhost:50053)",
     )
     parser.add_argument(
@@ -160,7 +161,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--redis_port",
         type=int,
-        default=6379,
+        default=os.getenv("REDIS_PORT", "6379"),
         help="Redis server port (default: 6379)",
     )
     args = parser.parse_args()
