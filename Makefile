@@ -126,8 +126,9 @@ test: ## Run tests
 	@python agender_analysis_service/agender_analysis_service.py --address [::]:60054 --storage_address localhost:60050 --redis_host localhost --redis_port 6379 &
 	@echo "Starting ImageInputService on port 60053 in background..."
 	@python image_input_service/image_input_service.py --face_analysis_address localhost:60052 --agender_analysis_address localhost:60054 --image_input_port 60053 &
-	@sleep 10  # Give services time to start
 	@echo "Running DataStorageService test client..."
+	@sleep 10  # Give services time to start
+	@echo "----------All Services Started Successfully----------"
 	@python tests/test_client.py --image_input_address localhost:60053
 	@echo "Cleaning up test processes..."
 	@-$(KILL) || echo "No Python processes to kill."
