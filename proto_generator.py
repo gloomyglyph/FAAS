@@ -22,6 +22,7 @@ def generate_protos():
         os.path.join(base_dir, "face_analysis_service"),
         os.path.join(base_dir, "agender_analysis_service"),
         os.path.join(base_dir, "image_input_service"),
+        os.path.join(base_dir, "tests"),
     ]
 
     # Proto files to compile

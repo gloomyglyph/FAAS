@@ -4,9 +4,6 @@ import sys
 import asyncio
 import grpc
 import argparse
-
-# Add the proto_generated folder to the Python path
-sys.path.append(os.path.abspath("./proto_files"))
 import image_input_pb2_grpc
 import common_pb2
 from pathlib import Path
